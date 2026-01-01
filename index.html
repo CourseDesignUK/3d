@@ -1,0 +1,215 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2867
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 <!DOCTYPE html>\
+<html lang="en">\
+<head>\
+  <meta charset="UTF-8" />\
+  <title>3D File Viewer (STL / GLTF / OBJ)</title>\
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />\
+  <style>\
+    body \{ margin: 0; font-family: system-ui, sans-serif; background: #f2f2f2; color: #000; overflow: hidden; \}\
+    #ui \{\
+      position: fixed;\
+      top: 10px;\
+      left: 10px;\
+      background: rgba(0,0,0,0.8);\
+      padding: 12px;\
+      border-radius: 10px;\
+      z-index: 10;\
+      width: 260px;\
+      color: #fff;\
+    \}\
+    input, button, select \{ margin-bottom: 6px; width: 100%; \}\
+    canvas \{ display: block; \}\
+  </style>\
+</head>\
+<body>\
+\
+<div id="ui">\
+  <button id="themeToggleBtn">Dark mode</button>\
+  <input type="file" id="fileInput" accept=".stl,.obj,.glb,.gltf" />\
+  <button id="rotateBtn">Rotate</button>\
+  <button id="scaleUpBtn">Scale +</button>\
+  <button id="scaleDownBtn">Scale \uc0\u8722 </button>\
+  <button id="rimToggleBtn">Rim light: off</button>\
+  <label style="font-size:12px">Rim intensity</label>\
+  <input id="rimIntensity" type="range" min="0" max="2" step="0.05" value="0.8" />\
+\
+  <label style="font-size:12px">Load Model</label>\
+  <select id="modelSelector">\
+    <option value="">Select a model</option>\
+    <option value="https://raw.githubusercontent.com/CourseDesignUK/3d/main/Bone%20Tumour%201.glb">Bone Tumour 1</option>\
+    <option value="https://raw.githubusercontent.com/CourseDesignUK/3d/main/Bone%20Tumour%202.glb">Bone Tumour 2</option>\
+    <option value="https://raw.githubusercontent.com/CourseDesignUK/3d/main/Bone101.glb">Bone101</option>\
+    <option value="https://raw.githubusercontent.com/CourseDesignUK/3d/main/Ewings%202%20Tumour%20102.glb">Ewing 2 Tumour 102</option>\
+    <option value="https://raw.githubusercontent.com/CourseDesignUK/3d/main/Ewings%20Tumour%20101.glb">Ewing Tumour 101</option>\
+    <option value="https://raw.githubusercontent.com/CourseDesignUK/3d/main/Left%20femur.glb">Left femur</option>\
+    <option value="https://raw.githubusercontent.com/CourseDesignUK/3d/main/Left%20hip%201.glb">Left hip 1</option>\
+    <option value="https://raw.githubusercontent.com/CourseDesignUK/3d/main/Left%20hip%202.glb">Left hip 2</option>\
+    <option value="https://raw.githubusercontent.com/CourseDesignUK/3d/main/Right%20femur%20102.glb">Right femur 102</option>\
+    <option value="https://raw.githubusercontent.com/CourseDesignUK/3d/main/Right%20femur%203.glb">Right femur 3</option>\
+    <option value="https://raw.githubusercontent.com/CourseDesignUK/3d/main/Right%20femur.glb">Right femur</option>\
+    <option value="https://raw.githubusercontent.com/CourseDesignUK/3d/main/male_human_skeleton_-_zbrush_-_anatomy_study.glb">Male human skeleton</option>\
+  </select>\
+</div>\
+\
+<script src="https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.min.js"></script>\
+<script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/controls/OrbitControls.js"></script>\
+<script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/loaders/GLTFLoader.js"></script>\
+<script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/loaders/OBJLoader.js"></script>\
+<script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/loaders/STLLoader.js"></script>\
+\
+<script>\
+  var scene = new THREE.Scene();\
+  scene.background = new THREE.Color(0xf2f2f2);\
+\
+  var camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);\
+  camera.position.set(0, 1.5, 3);\
+\
+  var renderer = new THREE.WebGLRenderer(\{ antialias: true \});\
+  renderer.setSize(window.innerWidth, window.innerHeight);\
+  document.body.appendChild(renderer.domElement);\
+\
+  var controls = new THREE.OrbitControls(camera, renderer.domElement);\
+  controls.enableDamping = true;\
+\
+  var dirLight = new THREE.DirectionalLight(0xffffff, 1);\
+  dirLight.position.set(5, 5, 5);\
+  scene.add(dirLight);\
+\
+  var ambientLight = new THREE.AmbientLight(0xffffff, 0.4);\
+  scene.add(ambientLight);\
+\
+  var fillLight = new THREE.PointLight(0xffffff, 0.6, 50);\
+  fillLight.position.set(-3, 2, 3);\
+  scene.add(fillLight);\
+\
+  var rimLight = new THREE.DirectionalLight(0xffffff, 0.8);\
+  rimLight.position.set(0, 3, -5);\
+  rimLight.visible = false;\
+  scene.add(rimLight);\
+\
+  var rimIntensitySlider = document.getElementById('rimIntensity');\
+  rimIntensitySlider.oninput = function () \{\
+    rimLight.intensity = parseFloat(this.value);\
+  \};\
+\
+  var currentModel = null;\
+  var isDarkMode = false;\
+  var rimLightEnabled = false;\
+  var autoRotate = false;\
+  var autoRotateSpeed = 0.01;\
+\
+  function applyTheme() \{\
+    if (isDarkMode) \{\
+      document.body.style.background = '#111';\
+      document.body.style.color = '#fff';\
+      scene.background.set(0x111111);\
+      ambientLight.intensity = 0.4;\
+      dirLight.intensity = 1.0;\
+      document.getElementById('themeToggleBtn').innerText = 'Light mode';\
+    \} else \{\
+      document.body.style.background = '#f2f2f2';\
+      document.body.style.color = '#000';\
+      scene.background.set(0xf2f2f2);\
+      ambientLight.intensity = 0.6;\
+      dirLight.intensity = 0.9;\
+      document.getElementById('themeToggleBtn').innerText = 'Dark mode';\
+    \}\
+  \}\
+\
+  function clearModel() \{\
+    if (!currentModel) return;\
+    scene.remove(currentModel);\
+    currentModel = null;\
+  \}\
+\
+  function centerAndScale(object) \{\
+    var box = new THREE.Box3().setFromObject(object);\
+    var size = new THREE.Vector3();\
+    box.getSize(size);\
+    var maxDim = Math.max(size.x, size.y, size.z);\
+    var scale = 1.5 / maxDim;\
+    object.scale.set(scale, scale, scale);\
+    box.setFromObject(object);\
+    var center = new THREE.Vector3();\
+    box.getCenter(center);\
+    object.position.sub(center);\
+  \}\
+\
+  document.getElementById('fileInput').addEventListener('change', function (e) \{\
+    var file = e.target.files[0]; if (!file) return;\
+    clearModel(); var url = URL.createObjectURL(file);\
+    var ext = file.name.split('.').pop().toLowerCase();\
+\
+    if (ext === 'stl') \{\
+      new THREE.STLLoader().load(url, function (geometry) \{\
+        currentModel = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial(\{ color: 0xaaaaaa \}));\
+        scene.add(currentModel); centerAndScale(currentModel);\
+      \});\
+    \} else if (ext === 'obj') \{\
+      new THREE.OBJLoader().load(url, function (obj) \{\
+        currentModel = obj; scene.add(currentModel); centerAndScale(currentModel);\
+      \});\
+    \} else if (ext === 'glb' || ext === 'gltf') \{\
+      new THREE.GLTFLoader().load(url, function (gltf) \{\
+        currentModel = gltf.scene; scene.add(currentModel); centerAndScale(currentModel);\
+      \});\
+    \}\
+  \});\
+\
+  var modelSelector = document.getElementById('modelSelector');\
+  modelSelector.onchange = function() \{\
+    if (this.value) loadURL(this.value);\
+  \};\
+\
+  function loadURL(src) \{\
+    clearModel();\
+    new THREE.GLTFLoader().load(src, function(gltf) \{\
+      currentModel = gltf.scene; scene.add(currentModel); centerAndScale(currentModel);\
+    \}, undefined, function(err) \{\
+      console.error('Model load failed', err);\
+      alert('Failed to load model. Check the URL or CORS.');\
+    \});\
+  \}\
+\
+  document.getElementById('themeToggleBtn').onclick = function () \{\
+    isDarkMode = !isDarkMode; applyTheme();\
+  \};\
+\
+  document.getElementById('rimToggleBtn').onclick = function () \{\
+    rimLightEnabled = !rimLightEnabled;\
+    rimLight.visible = rimLightEnabled;\
+    this.innerText = rimLightEnabled ? 'Rim light: on' : 'Rim light: off';\
+  \};\
+\
+  document.getElementById('rotateBtn').onclick = function () \{\
+    autoRotate = !autoRotate;\
+    this.innerText = autoRotate ? 'Stop rotation' : 'Rotate';\
+  \};\
+  document.getElementById('scaleUpBtn').onclick = function () \{ if (currentModel) currentModel.scale.multiplyScalar(1.2); \};\
+  document.getElementById('scaleDownBtn').onclick = function () \{ if (currentModel) currentModel.scale.multiplyScalar(0.8); \};\
+\
+  function animate() \{\
+    requestAnimationFrame(animate);\
+    if (autoRotate && currentModel) currentModel.rotation.y += autoRotateSpeed;\
+    controls.update();\
+    renderer.render(scene, camera);\
+  \}\
+\
+  applyTheme(); animate();\
+  window.addEventListener('resize', function () \{\
+    camera.aspect = window.innerWidth / window.innerHeight;\
+    camera.updateProjectionMatrix();\
+    renderer.setSize(window.innerWidth, window.innerHeight);\
+  \});\
+</script>\
+\
+</body>\
+</html>\
+}
